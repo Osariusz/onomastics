@@ -19,6 +19,7 @@ class Language:
     max_bordering_vowels = 1
     allowed_bordering_vowels = []
 
+
     def __init__(self, begin_words=[], end_words=[], anywhere_words=[], consonants=[], vowels=[], max_bordering_consonants=2, allowed_bordering_consonants=[], max_bordering_vowels=1, allowed_bordering_vowels=[]):
         self.begin_words = begin_words
         self.end_words = end_words
@@ -106,65 +107,59 @@ class Language:
             return self.generate_random_word(max_length, consonant_first)
         return numpy.random.choice(segments)
 
-    def generate_partial_segment_back(self, max_length, consonant_last):
-        result = ""
-        length_left = max_length
-        consonant_before = True
-        if(consonant_first):
-            consonant_before = False
-        while(length_left>0):
-            if(consonant_before):
-                result += self.consonant_segment(length_left)
-            else:
-                result += self.vowel_segment(length_left) #trzeba odwrócić tekst po wygenerowaniu
-            length_left = max_length-len(result)
-            consonant_before = not consonant_before
-        return result
-
+    def end_word_fits_segment(self, max_length, word, consonant_first):
+        return len(word)<max_length or (len(word)==max_length and (consonant_first == self.word_first_letter_consonant(word)))
 
     def generate_partial_segment_front(self, max_length, consonant_first):
-        result = ""
-        length_left = max_length
-        consonant_before = True
-        if(consonant_first):
-            consonant_before = False
-        while(length_left>0):
-            if(consonant_before):
-                result += self.consonant_segment(length_left)
-            else:
-                result += self.vowel_segment(length_left) #TU SKOŃCZYŁĘM
-            length_left = max_length-len(result)
-            consonant_before = not consonant_before
-        return result
 
-    def generate_partial_segment(self, max_length, consonant_first, consonant_last):
+        segment_usage_chance = 0.3
+
         result = ""
         length_left = max_length
         consonant_before = True
         if(consonant_first):
             consonant_before = False
         while(length_left>0):
+            if(numpy.random.uniform()<=segment_usage_chance):
+                fitting_words = []
+                for word in self.anywhere_words:
+                    if(len(word)<=length_left and self.word_first_letter_consonant(word) == consonant_before and not word in result):
+                        fitting_words.append(word)
+                if(len(fitting_words)>0):
+                    result += numpy.random.choice(fitting_words)
+                    length_left = max_length-len(result)
+                    consonant_before = not self.word_last_letter_consonant(result)
+                    continue
             if(consonant_before):
                 result += self.consonant_segment(length_left)
             else:
-                result += self.vowel_segment(length_left) #TU SKOŃCZYŁĘM
+                result += self.vowel_segment(length_left)
             length_left = max_length-len(result)
-            consonant_before = not consonant_before
+            consonant_before = not self.word_last_letter_consonant(result)
         return result
 
     def fitting_segment(self, max_length,consonant_first):
-        segment_chance = 0.1
+        segment_chance = 0.7
 
         if(numpy.random.uniform()<=segment_chance):
+            fitting_end_words = []
             for word in self.end_words:
-                if(len(word)<max_length or (len(word)==max_length and (consonant_first == self.word_first_letter_consonant(word)))):
+                if(self.end_word_fits_segment(max_length,word,consonant_first)):
                     if(len(word)==max_length):
                         return word
                     else:
-                        random_length = max_length-len(word)
-                        
+                        fitting_end_words.append(word)
 
-            return self.word_anywhere_segment(max_length, consonant_first)
+            if(len(fitting_end_words)==0):
+                return self.generate_partial_segment_front(max_length,consonant_first)
+            fitting_end_word = numpy.random.choice(fitting_end_words)
+
+            liner = self.generate_partial_segment_front(max_length-len(fitting_end_word),consonant_first)
+            if(self.end_word_fits_segment(max_length-len(liner),fitting_end_word,not self.word_last_letter_consonant(liner))):
+                return liner+fitting_end_word
+            else:
+                return self.generate_partial_segment_front(max_length, consonant_first)
+
         else:  
             return self.generate_partial_segment_front(max_length,consonant_first)
 
